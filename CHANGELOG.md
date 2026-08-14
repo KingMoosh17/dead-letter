@@ -1,3 +1,23 @@
+# Dead Letter v1.1.2
+
+## Windows build
+- Public releases now include a standalone **DeadLetter.exe** with a custom Dead Letter icon.
+- Added a standalone **DeadLetterUpdater.exe** so future executable builds can update without a Python installation.
+- Retired the legacy `run_game.bat` launcher from public releases.
+
+## Interface polish
+- Removed the extra title-screen tagline for a cleaner title composition.
+- Fixed difficulty/word-bank selection buttons flashing white while changing selections.
+- Standardized selected-button typography so `SELECTED` is consistently bold.
+- Added representative example words to every word-bank card.
+- Enlarged the Hangman panel and figure.
+- Bonus mistake capacity is now consumed visually before the six-part Hangman begins drawing.
+- Standardized Glyph rarity colors across inventory, reward/reroll cards, replacement UI, and Compendium.
+- Removed visible Glyph category labels; Glyph presentation is now name + rarity + description.
+- Compendium Glyphs default to Common → Uncommon → Rare and now support rarity filters plus multiple sorting modes.
+- Axiom and Boss compendium tabs also support ascending/descending name sorting.
+- End-of-run build summary no longer tries to classify the build into a single Glyph category.
+
 # Dead Letter v1.1.1
 
 ## Interface
