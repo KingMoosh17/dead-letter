@@ -1,0 +1,111 @@
+name: Publish Dead Letter Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - RELEASE_REQUEST.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dead-letter-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve requested version
+        shell: bash
+        run: |
+          set -euo pipefail
+          REQUEST="$(head -n 1 RELEASE_REQUEST.txt | tr -d '\r')"
+          VERSION="${REQUEST%% *}"
+          CURRENT="$(tr -d '[:space:]' < VERSION.txt)"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "RELEASE_REQUEST.txt must begin with a semantic version such as 1.2.0."
+            exit 1
+          fi
+          if [[ "$VERSION" != "$CURRENT" ]]; then
+            echo "Requested version $VERSION does not match VERSION.txt ($CURRENT)."
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
+          echo "ASSET=Dead_Letter_v$VERSION.zip" >> "$GITHUB_ENV"
+
+      - name: Validate release source
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            main.py
+            game_logic.py
+            effects.py
+            content.py
+            wordbank.py
+            sound.py
+            update_manager.py
+            updater.py
+            DeadLetter.pyw
+            run_game.bat
+            VERSION.txt
+            update_config.json
+            data/words.csv
+          )
+          for path in "${required[@]}"; do
+            if [[ ! -f "$path" ]]; then
+              echo "Missing required release file: $path"
+              exit 1
+            fi
+          done
+
+      - name: Build release ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          zip -r -q "dist/$ASSET" . \
+            -x '.git/*' \
+               '.github/*' \
+               'dist/*' \
+               '__pycache__/*' \
+               '*/__pycache__/*' \
+               '*.pyc' \
+               '.gitignore' \
+               'GITHUB_SETUP.md' \
+               'RELEASE_REQUEST.txt' \
+               'tests/*' \
+               'test_*' \
+               'telemetry/*'
+          (cd dist && sha256sum "$ASSET" > "$ASSET.sha256")
+
+      - name: Create or refresh GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "dist/$ASSET" "dist/$ASSET.sha256" --clobber
+          else
+            gh release create "$TAG" \
+              "dist/$ASSET" \
+              "dist/$ASSET.sha256" \
+              --target "$GITHUB_SHA" \
+              --title "Dead Letter v$VERSION" \
+              --generate-notes
+          fi
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "Published $TAG with $ASSET" >> "$GITHUB_STEP_SUMMARY"
