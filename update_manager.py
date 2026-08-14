@@ -1,7 +1,7 @@
 """GitHub Releases update checker/downloader for Dead Letter.
 
-The game never stores player data in the install directory, so replacing the
-application files leaves settings, statistics, and telemetry untouched.
+Player data lives outside the install directory, so replacing application files
+preserves settings, statistics, and local telemetry.
 """
 from __future__ import annotations
 
@@ -91,7 +91,7 @@ class UpdateManager:
             notes=str(data.get("body") or "")[:1200],
         )
 
-    def stage_update(self, info: UpdateInfo, timeout: float = 30.0) -> Path:
+    def stage_update(self, info: UpdateInfo, timeout: float = 45.0) -> Path:
         temp_root = Path(tempfile.mkdtemp(prefix="dead_letter_update_"))
         archive = temp_root / info.asset_name
         req = urllib.request.Request(info.asset_url, headers={"User-Agent": f"DeadLetter/{self.current_version}"})
@@ -101,7 +101,6 @@ class UpdateManager:
             extract = temp_root / "extract"
             extract.mkdir()
             with zipfile.ZipFile(archive) as zf:
-                # Refuse absolute/traversal paths before extraction.
                 for member in zf.infolist():
                     dest = (extract / member.filename).resolve()
                     if extract.resolve() not in dest.parents and dest != extract.resolve():
@@ -112,7 +111,7 @@ class UpdateManager:
             raise
 
         roots = [extract] + [p for p in extract.iterdir() if p.is_dir()]
-        source = next((r for r in roots if (r / "VERSION.txt").exists() and (r / "main.py").exists()), None)
+        source = next((r for r in roots if (r / "VERSION.txt").exists() and ((r / "DeadLetter.exe").exists() or (r / "main.py").exists())), None)
         if source is None:
             shutil.rmtree(temp_root, ignore_errors=True)
             raise ValueError("The release ZIP is not a valid Dead Letter package.")
@@ -123,17 +122,17 @@ class UpdateManager:
         return source
 
     def launch_installer(self, staged_source: str | Path):
-        updater = self.install_dir / "updater.py"
-        if not updater.exists():
-            raise FileNotFoundError("updater.py is missing from the installation.")
-        args = [
-            sys.executable,
-            str(updater),
-            "--pid", str(os.getpid()),
-            "--source", str(Path(staged_source).resolve()),
-            "--target", str(self.install_dir),
-        ]
+        staged_source = Path(staged_source).resolve()
+        common_args = ["--pid", str(os.getpid()), "--source", str(staged_source), "--target", str(self.install_dir)]
+        staged_exe = staged_source / "DeadLetterUpdater.exe"
+        if os.name == "nt" and staged_exe.exists():
+            args = [str(staged_exe), *common_args]
+        else:
+            updater = self.install_dir / "updater.py"
+            if not updater.exists():
+                raise FileNotFoundError("DeadLetterUpdater.exe/updater.py is missing.")
+            args = [sys.executable, str(updater), *common_args]
         flags = 0
         if os.name == "nt":
             flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
-        subprocess.Popen(args, close_fds=(os.name != "nt"), creationflags=flags)
+        subprocess.Popen(args, cwd=str(staged_source), close_fds=(os.name != "nt"), creationflags=flags)
