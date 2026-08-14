@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.log
+.DS_Store
+Thumbs.db
+
+# Local development/player outputs
+telemetry/
+feedback/
+*.tmp
+
+# Optional compressed working copy of the word database
+*.csv.gz
