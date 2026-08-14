@@ -1,4 +1,4 @@
-# Dead Letter v1.1.6
+# Dead Letter v1.1.10
 
 A timed Hangman roguelike. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
 
@@ -12,6 +12,7 @@ The repository also includes the Python source for development and debugging.
 
 - Six mistakes added to your meter, or an empty timer, ends the run.
 - Each Chapter is Word 1 → Word 2 → Word 3 → Boss.
+- Every Chapter begins with an untimed preview showing its average target Complexity, expected starting time, and upcoming Boss.
 - Solved words award Points and a Glyph choice. Points pay for rerolls.
 - Bosses award permanent Axioms.
 - Beat Chapter 8 to win; Endless continues until defeat.
@@ -44,7 +45,7 @@ Five large pools can be selected for each run:
 - `Esc`: leave the full-word box
 - `F11`: toggle fullscreen/windowed
 - **Restart:** always available during a run; starts a fresh run with the same difficulty and word bank
-- **Save & Exit:** available only on untimed safe screens
+- **Save & Exit:** available on untimed safe screens, including Chapter and Boss previews
 
 ## Saves and player data
 
@@ -62,6 +63,4 @@ Dead Letter checks the public `KingMoosh17/dead-letter` GitHub Releases feed. Th
 
 Updates keep the installation path and the `DeadLetter.exe` filename stable, so a normal Windows shortcut to the executable continues to work after in-place updates. Settings, stats, and telemetry are preserved. A saved Continue Run must be discarded before updating, and the game asks for confirmation first.
 
-Public releases include a standalone `DeadLetterUpdater.exe`; it has a deliberately different icon from the main game executable. v1.1.4 added retry-based handling for brief Windows executable locks and updater diagnostics at `%APPDATA%\DeadLetter\update.log`.
-
-v1.1.5 made update discovery more resilient and adjusted The Forbidden so its blocked present letter stays hidden until the player probes it. v1.1.6 fixes the remaining New Run layout issue by reserving full-size word-bank selector controls before laying out each card's descriptive text.
+Public releases include a standalone `DeadLetterUpdater.exe`; it has a deliberately different icon from the main game executable. The updater retries brief Windows executable locks and writes diagnostics to `%APPDATA%\DeadLetter\update.log` if installation fails.
