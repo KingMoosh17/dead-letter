@@ -48,7 +48,7 @@ jobs:
           $required = @(
             "main.py", "game_logic.py", "effects.py", "content.py", "wordbank.py",
             "sound.py", "storage.py", "telemetry.py", "ui_patch.py",
-            "update_manager.py", "updater.py", "DeadLetter.pyw",
+            "update_manager.py", "updater.py", "DeadLetter.pyw", "build_icon.py",
             "VERSION.txt", "update_config.json", "data/words.csv"
           )
           foreach ($path in $required) {
@@ -62,10 +62,10 @@ jobs:
       - name: Syntax check release modules
         shell: pwsh
         run: |
-          python -m py_compile ui_patch.py update_manager.py updater.py DeadLetter.pyw
+          python -m py_compile ui_patch.py update_manager.py updater.py DeadLetter.pyw build_icon.py
           python -c "import content, wordbank, storage; print('Source imports OK')"
 
-      - name: Generate application icon
+      - name: Generate application icons
         shell: pwsh
         run: python build_icon.py
 
@@ -85,7 +85,7 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed `
             --name DeadLetterUpdater `
-            --icon DeadLetter.ico `
+            --icon DeadLetterUpdater.ico `
             updater.py
 
       - name: Assemble public package
@@ -96,7 +96,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$pkg\data" | Out-Null
           Copy-Item "dist\DeadLetter.exe" "$pkg\DeadLetter.exe"
           Copy-Item "dist\DeadLetterUpdater.exe" "$pkg\DeadLetterUpdater.exe"
-          Copy-Item "DeadLetter.ico" "$pkg\DeadLetter.ico"
           Copy-Item "VERSION.txt" "$pkg\VERSION.txt"
           Copy-Item "update_config.json" "$pkg\update_config.json"
           Copy-Item "README.md" "$pkg\README.md"
@@ -149,5 +148,5 @@ jobs:
       - name: Summary
         shell: pwsh
         run: |
-          "Published $env:TAG with $env:ASSET and standalone Windows executables." |
+          "Published $env:TAG with $env:ASSET, a branded game executable, and a distinct updater executable." |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
