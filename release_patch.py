@@ -43,28 +43,41 @@ def _replace_player_facing_definitions():
     )
 
 
-def _replace_selector(frame, old_selector, text, command, selected, accent, height):
-    """Replace a geometry-dependent selector with an exact-height control.
+def _replace_selector_at_rendered_geometry(frame, old_selector, text, command, selected, accent, target_height):
+    """Replace a selector using its *rendered* Windows geometry.
 
-    Tk's packer can squeeze a normal Label when a fixed-height card runs out of
-    vertical room. A non-propagating holder reserves the selector's pixels first,
-    and the clickable label fills that holder with place(), so difficulty and
-    word-bank selectors are guaranteed to render at the same height.
+    Tk can report one requested height and then render the difficulty selector
+    at a larger physical height after DPI/font scaling. We therefore measure the
+    already-rendered difficulty selectors, use that real pixel height as the
+    target, grow shorter bank cards by exactly the difference, and place the new
+    control at explicit pixel geometry. The packer can no longer squeeze it.
     """
     try:
-        old_selector.pack_forget()
+        x = int(old_selector.winfo_x())
+        y = int(old_selector.winfo_y())
+        width = int(old_selector.winfo_width())
+        old_height = int(old_selector.winfo_height())
+        frame_height = int(frame.winfo_height())
+    except tk.TclError:
+        x, y, width, old_height, frame_height = 14, 0, 1, target_height, 1
+
+    grow = max(0, int(target_height) - max(1, old_height))
+    if grow:
+        try:
+            frame.config(height=max(1, frame_height + grow))
+            frame.pack_propagate(False)
+        except tk.TclError:
+            pass
+
+    try:
         old_selector.destroy()
     except tk.TclError:
         pass
 
     bg = accent if selected else M.PANEL2
     fg = M.BG if selected else M.TEXT
-    holder = tk.Frame(frame, bg=bg, height=height, bd=0, highlightthickness=0)
-    holder.pack(side="bottom", fill="x")
-    holder.pack_propagate(False)
-
     label = tk.Label(
-        holder,
+        frame,
         text=text,
         bg=bg,
         fg=fg,
@@ -74,32 +87,37 @@ def _replace_selector(frame, old_selector, text, command, selected, accent, heig
         bd=0,
         highlightthickness=0,
     )
-    label.place(x=0, y=0, relwidth=1, relheight=1)
     label.bind("<Button-1>", lambda _e: command())
+
+    if width > 1:
+        # Keep the exact horizontal inset/width of the selector that ui_patch
+        # already laid out, but force the physical height to match Difficulty.
+        label.place(x=x, y=y, width=width, height=int(target_height))
+    else:
+        label.place(relx=0, x=14, y=y, relwidth=1, width=-28, height=int(target_height))
     return label
 
 
 def patched_show_start(self):
     original_show_start(self)
 
-    # v1.1.7: use one fixed-height selector component for BOTH sections.
-    # This is intentionally not a padding tweak: both difficulty and word-bank
-    # selectors now sit in identical non-propagating holders, so card contents
-    # cannot compress one set independently of the other.
+    # Measure what Windows ACTUALLY rendered, not winfo_reqheight(). This is the
+    # key difference from v1.1.7 and makes the fix respect DPI/Tk font scaling.
     try:
         self.root.update_idletasks()
-        requested = [
-            selector.winfo_reqheight()
+        rendered_diff_heights = [
+            int(selector.winfo_height())
             for _did, (_frame, selector, _color) in getattr(self, "_start_diff_widgets", {}).items()
+            if int(selector.winfo_height()) > 1
         ]
-        selector_height = max([34, *requested])
-    except tk.TclError:
+        selector_height = max(rendered_diff_heights) if rendered_diff_heights else 34
+    except (tk.TclError, ValueError):
         selector_height = 34
 
     new_diff = {}
     for did, (frame, selector, color) in list(getattr(self, "_start_diff_widgets", {}).items()):
         chosen = did == self.selected_difficulty
-        replacement = _replace_selector(
+        replacement = _replace_selector_at_rendered_geometry(
             frame,
             selector,
             "SELECTED" if chosen else "SELECT",
@@ -114,13 +132,7 @@ def patched_show_start(self):
     new_banks = {}
     for bid, (frame, title, selector) in list(getattr(self, "_start_bank_widgets", {}).items()):
         chosen = bid == self.selected_bank_id
-        # Give the copy enough room that examples do not get hidden behind the
-        # now-reserved selector, while keeping the cards compact.
-        try:
-            frame.config(height=134)
-        except tk.TclError:
-            pass
-        replacement = _replace_selector(
+        replacement = _replace_selector_at_rendered_geometry(
             frame,
             selector,
             "SELECTED" if chosen else "SELECT",
@@ -131,6 +143,17 @@ def patched_show_start(self):
         )
         new_banks[bid] = (frame, title, replacement)
     self._start_bank_widgets = new_banks
+
+    # Let parent rows react to any bank-card growth, then verify/enforce the
+    # physical selector height one more time after Tk has completed layout.
+    self.root.update_idletasks()
+    for _bid, (_frame, _title, selector) in self._start_bank_widgets.items():
+        try:
+            if int(selector.winfo_height()) != int(selector_height):
+                info = selector.place_info()
+                selector.place_configure(height=int(selector_height))
+        except tk.TclError:
+            pass
     self._refresh_start_selection()
 
 
