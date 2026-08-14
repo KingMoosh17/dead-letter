@@ -1,4 +1,4 @@
-# Dead Letter v1.1.5
+# Dead Letter v1.1.6
 
 A timed Hangman roguelike. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
 
@@ -64,4 +64,4 @@ Updates keep the installation path and the `DeadLetter.exe` filename stable, so 
 
 Public releases include a standalone `DeadLetterUpdater.exe`; it has a deliberately different icon from the main game executable. v1.1.4 added retry-based handling for brief Windows executable locks and updater diagnostics at `%APPDATA%\DeadLetter\update.log`.
 
-v1.1.5 makes update discovery more resilient as well: if GitHub's API lookup fails or is rate-limited, the game falls back to the public latest-release redirect instead of incorrectly treating the failure as proof that the installed version is current.
+v1.1.5 made update discovery more resilient and adjusted The Forbidden so its blocked present letter stays hidden until the player probes it. v1.1.6 fixes the remaining New Run layout issue by reserving full-size word-bank selector controls before laying out each card's descriptive text.
