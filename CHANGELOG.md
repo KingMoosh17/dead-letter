@@ -1,3 +1,13 @@
+# Dead Letter v1.1.4
+
+## Updater hotfix
+- Fixed an update failure introduced by the standalone one-file Windows executable build.
+- The updater now waits briefly for the exiting PyInstaller bootloader and retries replacement of locked application files instead of failing on the first Windows file-lock error.
+- File replacement is staged to temporary filenames and then swapped into place, reducing the chance of leaving a partially written executable.
+- Added `%APPDATA%\DeadLetter\update.log` with timestamps and install steps for updater diagnostics.
+- Windowed updater failures now show a visible error dialog instead of silently returning to the old version.
+- The installed `VERSION.txt` is verified before the updated game is relaunched.
+
 # Dead Letter v1.1.3
 
 ## Interface cleanup
