@@ -1,3 +1,23 @@
+# Dead Letter v1.1.10
+
+## Chapter previews
+- Every Chapter now opens on an untimed **Chapter Preview** screen before Word 1 begins.
+- New Run and Restart land on the Chapter 1 preview instead of jumping directly into a timed word.
+- The preview shows the Chapter's average target Complexity, expected starting-time average/range, and upcoming Boss.
+- Chapter previews are safe save points and include **Save & Exit**.
+- Endless Chapters use the same preview flow.
+- Starting-time previews account for difficulty, predictable Axiom effects, and predictable Glyph timing effects; word-dependent/random Glyph effects are excluded and identified as such.
+
+## Flow
+- Entering a Chapter explicitly starts Word 1, keeping timers fully paused until the player confirms.
+- Existing Word 2, Word 3, Boss-approach, Glyph, and Axiom flows are unchanged.
+
+# Dead Letter v1.1.9
+
+## New Run layout
+- Removed the fixed-height and post-layout geometry experiments from the New Run screen.
+- Difficulty and word-bank cards now size naturally and share the same selector component.
+
 # Dead Letter v1.1.5
 
 ## New Run polish
