@@ -67,7 +67,9 @@ def main():
         return 2
 
     target.mkdir(parents=True, exist_ok=True)
-    for obsolete in ("run_game.bat",):
+    # These were visible release files in older builds but are now either
+    # obsolete or embedded inside the executable itself.
+    for obsolete in ("run_game.bat", "DeadLetter.ico", "DeadLetterUpdater.ico"):
         try:
             (target / obsolete).unlink(missing_ok=True)
         except OSError:
