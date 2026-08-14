@@ -59,11 +59,42 @@ jobs:
         shell: pwsh
         run: python -m pip install --disable-pip-version-check pyinstaller pillow
 
-      - name: Syntax check release modules
+      - name: Syntax and chapter-flow checks
         shell: pwsh
         run: |
           python -m py_compile ui_patch.py release_patch.py chapter_patch.py update_manager.py updater.py DeadLetter.pyw build_icon.py
           python -c "import content, wordbank, storage; print('Source imports OK')"
+          @'
+          import main
+          import ui_patch, release_patch, chapter_patch
+          from wordbank import WordBank
+          from game_logic import GameState
+
+          ui_patch.apply_patch(main)
+          release_patch.apply_patch(main)
+          chapter_patch.apply_patch(main)
+
+          bank = WordBank('data/words.csv', 'standard')
+          game = GameState(bank, seed=123456, difficulty='medium', bank_id='standard', telemetry_enabled=False)
+          game.start_round()
+          assert game.status == 'chapter_ready', game.status
+          assert game.round is None
+          assert game.can_save()
+
+          game._chapter_preview_entering = True
+          game.start_round()
+          del game._chapter_preview_entering
+          assert game.status == 'playing', game.status
+          assert game.round is not None
+
+          game.round_index = 4
+          game.round = None
+          game.status = 'axiom_choice'
+          game.start_round()
+          assert game.status == 'chapter_ready', game.status
+          assert game.chapter == 2
+          print('Chapter preview flow OK')
+          '@ | python -
 
       - name: Generate application icons
         shell: pwsh
