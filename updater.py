@@ -1,4 +1,4 @@
-"""Small out-of-process updater used by update_manager.py."""
+"""Out-of-process updater used by Dead Letter public builds."""
 from __future__ import annotations
 
 import argparse
@@ -30,6 +30,26 @@ def process_alive(pid: int) -> bool:
         return False
 
 
+def _launch_game(target: Path):
+    exe = target / "DeadLetter.exe"
+    if exe.exists():
+        subprocess.Popen([str(exe)], cwd=str(target))
+        return
+    pyw = target / "DeadLetter.pyw"
+    main_py = target / "main.py"
+    if os.name == "nt":
+        candidate = pyw if pyw.exists() else main_py
+        if candidate.exists():
+            try:
+                os.startfile(str(candidate))  # type: ignore[attr-defined]
+            except OSError:
+                pass
+        return
+    candidate = pyw if pyw.exists() else main_py
+    if candidate.exists() and not getattr(sys, "frozen", False):
+        subprocess.Popen([sys.executable, str(candidate)], cwd=str(target))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pid", type=int, required=True)
@@ -39,15 +59,20 @@ def main():
     source = Path(args.source).resolve()
     target = Path(args.target).resolve()
 
-    for _ in range(120):
+    for _ in range(160):
         if not process_alive(args.pid):
             break
         time.sleep(0.25)
     else:
         return 2
 
-    # Preserve only files that are intentionally local to the install and are
-    # not part of the release package. Player data is elsewhere in AppData.
+    target.mkdir(parents=True, exist_ok=True)
+    for obsolete in ("run_game.bat",):
+        try:
+            (target / obsolete).unlink(missing_ok=True)
+        except OSError:
+            pass
+
     for item in source.iterdir():
         dest = target / item.name
         try:
@@ -60,14 +85,7 @@ def main():
         except OSError:
             return 3
 
-    # Relaunch through the GUI entry point when possible.
-    entry = target / "DeadLetter.pyw"
-    if not entry.exists():
-        entry = target / "main.py"
-    try:
-        subprocess.Popen([sys.executable, str(entry)], cwd=str(target))
-    except OSError:
-        pass
+    _launch_game(target)
     return 0
 
 
