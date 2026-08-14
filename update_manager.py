@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -43,6 +44,7 @@ class UpdateManager:
         self.install_dir = Path(install_dir).resolve()
         self.current_version = current_version
         self.config_path = self.install_dir / "update_config.json"
+        self.last_error = ""
 
     def config(self) -> dict:
         try:
@@ -54,35 +56,35 @@ class UpdateManager:
         repo = str(self.config().get("repository", "")).strip()
         return bool(repo and "/" in repo)
 
-    def check_latest(self, timeout: float = 4.0) -> UpdateInfo | None:
-        cfg = self.config()
-        repo = str(cfg.get("repository", "")).strip()
-        if not repo or "/" not in repo:
-            return None
+    def _api_lookup(self, repo: str, preferred: str, timeout: float) -> UpdateInfo | None:
         api = f"https://api.github.com/repos/{repo}/releases/latest"
         req = urllib.request.Request(
             api,
-            headers={"User-Agent": f"DeadLetter/{self.current_version}", "Accept": "application/vnd.github+json"},
+            headers={
+                "User-Agent": f"DeadLetter/{self.current_version}",
+                "Accept": "application/vnd.github+json",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            },
         )
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                data = json.loads(response.read().decode("utf-8"))
-        except (OSError, urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
-            return None
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            data = json.loads(response.read().decode("utf-8"))
+
         latest = str(data.get("tag_name") or data.get("name") or "").strip().lstrip("v")
         if not latest or _version_tuple(latest) <= _version_tuple(self.current_version):
             return None
+
         assets = data.get("assets") or []
-        preferred = str(cfg.get("asset_prefix", "Dead_Letter_v"))
         candidates = [a for a in assets if str(a.get("name", "")).lower().endswith(".zip")]
         asset = next((a for a in candidates if str(a.get("name", "")).startswith(preferred)), None)
         if asset is None and candidates:
             asset = candidates[0]
         if not asset:
-            return None
+            raise ValueError("The latest GitHub release has no ZIP asset.")
+
         url = str(asset.get("browser_download_url") or "")
         if not url:
-            return None
+            raise ValueError("The latest GitHub release ZIP has no download URL.")
         return UpdateInfo(
             version=latest,
             asset_url=url,
@@ -90,6 +92,69 @@ class UpdateManager:
             release_url=str(data.get("html_url") or ""),
             notes=str(data.get("body") or "")[:1200],
         )
+
+    def _redirect_lookup(self, repo: str, preferred: str, timeout: float) -> UpdateInfo | None:
+        """Fallback that avoids GitHub's API rate limit entirely.
+
+        Public /releases/latest redirects to the newest release tag. Since Dead
+        Letter controls its asset naming convention, the ZIP URL can then be
+        constructed directly from the tag.
+        """
+        latest_url = f"https://github.com/{repo}/releases/latest"
+        req = urllib.request.Request(
+            latest_url,
+            headers={
+                "User-Agent": f"DeadLetter/{self.current_version}",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            final_url = response.geturl()
+
+        marker = "/releases/tag/"
+        if marker not in final_url:
+            raise ValueError("GitHub did not redirect to a release tag.")
+        tag = urllib.parse.unquote(final_url.split(marker, 1)[1].split("?", 1)[0].split("#", 1)[0]).strip("/")
+        latest = tag.lstrip("v")
+        if not latest or _version_tuple(latest) <= _version_tuple(self.current_version):
+            return None
+
+        asset_name = f"{preferred}{latest}.zip"
+        asset_url = (
+            f"https://github.com/{repo}/releases/download/"
+            f"{urllib.parse.quote(tag, safe='')}/{urllib.parse.quote(asset_name, safe='')}"
+        )
+        return UpdateInfo(
+            version=latest,
+            asset_url=asset_url,
+            asset_name=asset_name,
+            release_url=final_url,
+            notes="",
+        )
+
+    def check_latest(self, timeout: float = 5.0) -> UpdateInfo | None:
+        self.last_error = ""
+        cfg = self.config()
+        repo = str(cfg.get("repository", "")).strip()
+        if not repo or "/" not in repo:
+            self.last_error = "The update repository is not configured."
+            return None
+        preferred = str(cfg.get("asset_prefix", "Dead_Letter_v"))
+
+        api_error = ""
+        try:
+            return self._api_lookup(repo, preferred, timeout)
+        except Exception as exc:
+            api_error = f"GitHub API: {exc}"
+
+        try:
+            info = self._redirect_lookup(repo, preferred, timeout)
+            self.last_error = ""
+            return info
+        except Exception as exc:
+            self.last_error = f"{api_error}; public release fallback: {exc}"
+            return None
 
     def stage_update(self, info: UpdateInfo, timeout: float = 45.0) -> Path:
         temp_root = Path(tempfile.mkdtemp(prefix="dead_letter_update_"))
