@@ -16,96 +16,138 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Resolve requested version
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          REQUEST="$(head -n 1 RELEASE_REQUEST.txt | tr -d '\r')"
-          VERSION="${REQUEST%% *}"
-          CURRENT="$(tr -d '[:space:]' < VERSION.txt)"
-
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "RELEASE_REQUEST.txt must begin with a semantic version such as 1.2.0."
-            exit 1
-          fi
-          if [[ "$VERSION" != "$CURRENT" ]]; then
-            echo "Requested version $VERSION does not match VERSION.txt ($CURRENT)."
-            exit 1
-          fi
-
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
-          echo "ASSET=Dead_Letter_v$VERSION.zip" >> "$GITHUB_ENV"
+          $request = (Get-Content RELEASE_REQUEST.txt -First 1).Trim()
+          $version = ($request -split '\s+')[0]
+          $current = (Get-Content VERSION.txt -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "RELEASE_REQUEST.txt must begin with a semantic version such as 1.2.0."
+          }
+          if ($version -ne $current) {
+            throw "Requested version $version does not match VERSION.txt ($current)."
+          }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TAG=v$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "ASSET=Dead_Letter_v$version.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Validate release source
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          required=(
-            main.py
-            game_logic.py
-            effects.py
-            content.py
-            wordbank.py
-            sound.py
-            update_manager.py
-            updater.py
-            DeadLetter.pyw
-            run_game.bat
-            VERSION.txt
-            update_config.json
-            data/words.csv
+          $required = @(
+            "main.py", "game_logic.py", "effects.py", "content.py", "wordbank.py",
+            "sound.py", "storage.py", "telemetry.py", "ui_patch.py",
+            "update_manager.py", "updater.py", "DeadLetter.pyw",
+            "VERSION.txt", "update_config.json", "data/words.csv"
           )
-          for path in "${required[@]}"; do
-            if [[ ! -f "$path" ]]; then
-              echo "Missing required release file: $path"
-              exit 1
-            fi
-          done
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) { throw "Missing required release file: $path" }
+          }
+
+      - name: Install build tools
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check pyinstaller pillow
+
+      - name: Syntax check release modules
+        shell: pwsh
+        run: |
+          python -m py_compile ui_patch.py update_manager.py updater.py DeadLetter.pyw
+          python -c "import content, wordbank, storage; print('Source imports OK')"
+
+      - name: Generate application icon
+        shell: pwsh
+        run: python build_icon.py
+
+      - name: Build Dead Letter executable
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed `
+            --name DeadLetter `
+            --icon DeadLetter.ico `
+            --add-data "data;data" `
+            --add-data "update_config.json;." `
+            --add-data "DeadLetter.ico;." `
+            DeadLetter.pyw
+
+      - name: Build updater executable
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed `
+            --name DeadLetterUpdater `
+            --icon DeadLetter.ico `
+            updater.py
+
+      - name: Assemble public package
+        shell: pwsh
+        run: |
+          $pkg = "release_package"
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+          New-Item -ItemType Directory -Force -Path "$pkg\data" | Out-Null
+          Copy-Item "dist\DeadLetter.exe" "$pkg\DeadLetter.exe"
+          Copy-Item "dist\DeadLetterUpdater.exe" "$pkg\DeadLetterUpdater.exe"
+          Copy-Item "DeadLetter.ico" "$pkg\DeadLetter.ico"
+          Copy-Item "VERSION.txt" "$pkg\VERSION.txt"
+          Copy-Item "update_config.json" "$pkg\update_config.json"
+          Copy-Item "README.md" "$pkg\README.md"
+          Copy-Item "CHANGELOG.md" "$pkg\CHANGELOG.md"
+          $sourceFiles = @(
+            "DeadLetter.pyw", "main.py", "game_logic.py", "effects.py", "content.py",
+            "wordbank.py", "sound.py", "storage.py", "telemetry.py",
+            "ui_patch.py", "update_manager.py", "updater.py"
+          )
+          foreach ($file in $sourceFiles) { Copy-Item $file "$pkg\$file" }
+          Copy-Item "data\words.csv" "$pkg\data\words.csv"
+          if (Test-Path "data\sfx") { Copy-Item "data\sfx" "$pkg\data\sfx" -Recurse }
 
       - name: Build release ZIP
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          mkdir -p dist
-          zip -r -q "dist/$ASSET" . \
-            -x '.git/*' \
-               '.github/*' \
-               'dist/*' \
-               '__pycache__/*' \
-               '*/__pycache__/*' \
-               '*.pyc' \
-               '.gitignore' \
-               'GITHUB_SETUP.md' \
-               'RELEASE_REQUEST.txt' \
-               'tests/*' \
-               'test_*' \
-               'telemetry/*'
-          (cd dist && sha256sum "$ASSET" > "$ASSET.sha256")
+          @'
+          import hashlib
+          import os
+          import pathlib
+          import zipfile
+          root = pathlib.Path("release_package")
+          asset = pathlib.Path("dist") / os.environ["ASSET"]
+          with zipfile.ZipFile(asset, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+              for path in sorted(root.rglob("*")):
+                  if path.is_file():
+                      zf.write(path, path.relative_to(root).as_posix())
+          digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+          pathlib.Path(str(asset) + ".sha256").write_text(f"{digest}  {asset.name}\n", encoding="utf-8")
+          print(asset, digest)
+          '@ | python -
 
       - name: Create or refresh GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "dist/$ASSET" "dist/$ASSET.sha256" --clobber
-          else
-            gh release create "$TAG" \
-              "dist/$ASSET" \
-              "dist/$ASSET.sha256" \
-              --target "$GITHUB_SHA" \
-              --title "Dead Letter v$VERSION" \
+          gh release view "$env:TAG" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload "$env:TAG" "dist\$env:ASSET" "dist\$env:ASSET.sha256" --clobber
+          } else {
+            gh release create "$env:TAG" `
+              "dist\$env:ASSET" `
+              "dist\$env:ASSET.sha256" `
+              --target "$env:GITHUB_SHA" `
+              --title "Dead Letter v$env:VERSION" `
               --generate-notes
-          fi
+          }
 
       - name: Summary
-        shell: bash
+        shell: pwsh
         run: |
-          echo "Published $TAG with $ASSET" >> "$GITHUB_STEP_SUMMARY"
+          "Published $env:TAG with $env:ASSET and standalone Windows executables." |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
