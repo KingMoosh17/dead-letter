@@ -1,3 +1,23 @@
+# Dead Letter v1.1.5
+
+## New Run polish
+- Word-bank selectors now match the difficulty selectors in font weight and visual height.
+
+## Boss balance
+- **The Forbidden** no longer tells you its blocked present letter before the round.
+- The forbidden letter is revealed only when you attempt to guess it.
+- That discovery attempt is blocked harmlessly and does not add a mistake.
+- Once discovered, the forbidden letter remains visible in the word-information line for the rest of the Boss round.
+
+## Wording
+- Removed player-facing use of the technical phrase **charged mistake**.
+- Protection effects can still reduce an attempted penalty before it reaches the mistake meter; telemetry keeps that distinction internally.
+- Recovery Room and How to Play now describe mistakes in terms of what is actually added to the meter.
+
+## Update discovery
+- Added a public GitHub release-page fallback when the GitHub API lookup fails or is rate-limited.
+- Manual update checks now distinguish a network/release-service failure from a genuine up-to-date result.
+
 # Dead Letter v1.1.4
 
 ## Updater hotfix
