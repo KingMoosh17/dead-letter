@@ -1,4 +1,4 @@
-# Dead Letter v1.1.3
+# Dead Letter v1.1.4
 
 A timed Hangman roguelike. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
 
@@ -60,4 +60,4 @@ Dead Letter checks the public `KingMoosh17/dead-letter` GitHub Releases feed. Th
 
 Updates keep the installation path and the `DeadLetter.exe` filename stable, so a normal Windows shortcut to the executable continues to work after in-place updates. Settings, stats, and telemetry are preserved. A saved Continue Run must be discarded before updating, and the game asks for confirmation first.
 
-Public releases include a standalone `DeadLetterUpdater.exe`; it has a deliberately different icon from the main game executable.
+Public releases include a standalone `DeadLetterUpdater.exe`; it has a deliberately different icon from the main game executable. v1.1.4 also adds retry-based handling for brief Windows executable locks and writes updater diagnostics to `%APPDATA%\DeadLetter\update.log` if anything goes wrong.
