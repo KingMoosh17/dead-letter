@@ -1,18 +1,12 @@
-# Dead Letter v1.1.1
+# Dead Letter v1.1.2
 
-A timed Hangman roguelike for Python/Tkinter. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
+A timed Hangman roguelike. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
 
 ## Run the game
 
-Windows: double-click `run_game.bat` or `DeadLetter.pyw`.
+On Windows, double-click **`DeadLetter.exe`**. The public build is standalone and does not require a separate Python installation.
 
-Terminal:
-
-```text
-py main.py
-```
-
-No third-party Python packages are required. Python must include Tkinter.
+The repository still includes the Python source for development and debugging.
 
 ## Core rules
 
@@ -41,7 +35,7 @@ Five large pools can be selected for each run:
 - **Quickfire:** favors compact short/mid-length words where each reveal carries less information.
 - **Labyrinth:** favors unusual spelling, rare letters, awkward vowel structures, and deceptive patterns.
 
-The four alternate pools contain ~28k words each and intentionally overlap with Standard so they remain viable in long Endless runs.
+The four alternate pools contain ~28,000 words each and intentionally overlap with Standard so they remain viable in long Endless runs.
 
 ## Content
 
@@ -74,6 +68,6 @@ They are kept outside the installation folder so game updates do not overwrite t
 
 ## Updates
 
-The game can check a public GitHub Releases feed. When a newer release is available, an **Update to vX.Y** button appears on the main menu. Updates preserve settings, stats, and telemetry. A saved Continue Run must be discarded before updating, and the game asks for confirmation first.
+The game checks the configured public GitHub Releases feed. When a newer release is available, an **Update to vX.Y.Z** button appears on the main menu. Updates preserve settings, stats, and telemetry. A saved Continue Run must be discarded before updating, and the game asks for confirmation first.
 
-The release repository is configured in `update_config.json`. See `GITHUB_SETUP.md` for publisher setup.
+Public releases include a standalone `DeadLetterUpdater.exe`, allowing executable builds to update themselves without requiring Python.
