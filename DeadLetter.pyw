@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.1.8"
+VERSION = "1.1.9"
 
 
 def _launch():
