@@ -1,4 +1,4 @@
-# Dead Letter v1.1.4
+# Dead Letter v1.1.5
 
 A timed Hangman roguelike. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
 
@@ -10,12 +10,14 @@ The repository also includes the Python source for development and debugging.
 
 ## Core rules
 
-- Six charged mistakes or an empty timer ends the run.
+- Six mistakes added to your meter, or an empty timer, ends the run.
 - Each Chapter is Word 1 → Word 2 → Word 3 → Boss.
 - Solved words award Points and a Glyph choice. Points pay for rerolls.
 - Bosses award permanent Axioms.
 - Beat Chapter 8 to win; Endless continues until defeat.
 - Word Complexity is a Hangman-focused 1–10 rating rather than a length score.
+
+Protection can reduce a mistake before it reaches the meter. Internally telemetry distinguishes an attempted penalty from a mistake that actually counts, but player-facing rules refer to the meter directly.
 
 ## Difficulty
 
@@ -60,4 +62,6 @@ Dead Letter checks the public `KingMoosh17/dead-letter` GitHub Releases feed. Th
 
 Updates keep the installation path and the `DeadLetter.exe` filename stable, so a normal Windows shortcut to the executable continues to work after in-place updates. Settings, stats, and telemetry are preserved. A saved Continue Run must be discarded before updating, and the game asks for confirmation first.
 
-Public releases include a standalone `DeadLetterUpdater.exe`; it has a deliberately different icon from the main game executable. v1.1.4 also adds retry-based handling for brief Windows executable locks and writes updater diagnostics to `%APPDATA%\DeadLetter\update.log` if anything goes wrong.
+Public releases include a standalone `DeadLetterUpdater.exe`; it has a deliberately different icon from the main game executable. v1.1.4 added retry-based handling for brief Windows executable locks and updater diagnostics at `%APPDATA%\DeadLetter\update.log`.
+
+v1.1.5 makes update discovery more resilient as well: if GitHub's API lookup fails or is rate-limited, the game falls back to the public latest-release redirect instead of incorrectly treating the failure as proof that the installed version is current.
