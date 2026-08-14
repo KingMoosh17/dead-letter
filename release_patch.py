@@ -14,6 +14,14 @@ from game_logic import GameState
 
 M = None
 
+BANK_EXAMPLES = {
+    "standard": "ELEPHANT • QUARTZ • RHYTHM",
+    "common_tongue": "HOUSE • MARKET • GARDEN",
+    "bookish": "ARCHITECTURE • OBSERVATORY • MAGNITUDE",
+    "quickfire": "JAZZ • GYM • SAFE",
+    "labyrinth": "MYRRH • SYZYGY • QUEUE",
+}
+
 
 def _walk(widget):
     yield widget
@@ -32,7 +40,6 @@ def _replace_player_facing_definitions():
 
     # "Charged mistake" was an internal distinction between an attempted
     # penalty and a penalty that survives protection such as Pencil Eraser.
-    # Player-facing text now describes the meter directly instead.
     old = GLYPHS["recovery_room"]
     GLYPHS["recovery_room"] = GlyphDef(
         old.id,
@@ -43,123 +50,256 @@ def _replace_player_facing_definitions():
     )
 
 
-def _replace_selector_at_rendered_geometry(frame, old_selector, text, command, selected, accent, target_height):
-    """Replace a selector using its *rendered* Windows geometry.
+def _selector(parent, text, command, selected=False, accent=None):
+    """One shared selector control for difficulty and word-bank cards.
 
-    Tk can report one requested height and then render the difficulty selector
-    at a larger physical height after DPI/font scaling. We therefore measure the
-    already-rendered difficulty selectors, use that real pixel height as the
-    target, grow shorter bank cards by exactly the difference, and place the new
-    control at explicit pixel geometry. The packer can no longer squeeze it.
+    It deliberately uses natural geometry: no fixed holder, no measured pixel
+    height, no place() calls, and no native Button redraw state. This keeps the
+    two sections visually identical while avoiding the Windows white flash that
+    motivated the original Label-based selectors.
     """
-    try:
-        x = int(old_selector.winfo_x())
-        y = int(old_selector.winfo_y())
-        width = int(old_selector.winfo_width())
-        old_height = int(old_selector.winfo_height())
-        frame_height = int(frame.winfo_height())
-    except tk.TclError:
-        x, y, width, old_height, frame_height = 14, 0, 1, target_height, 1
-
-    grow = max(0, int(target_height) - max(1, old_height))
-    if grow:
-        try:
-            frame.config(height=max(1, frame_height + grow))
-            frame.pack_propagate(False)
-        except tk.TclError:
-            pass
-
-    try:
-        old_selector.destroy()
-    except tk.TclError:
-        pass
-
+    accent = accent or M.ACCENT
     bg = accent if selected else M.PANEL2
     fg = M.BG if selected else M.TEXT
     label = tk.Label(
-        frame,
+        parent,
         text=text,
         bg=bg,
         fg=fg,
         font=("Segoe UI", 9, "bold"),
-        cursor="hand2",
         anchor="center",
+        cursor="hand2",
+        pady=8,
         bd=0,
         highlightthickness=0,
     )
     label.bind("<Button-1>", lambda _e: command())
-
-    if width > 1:
-        # Keep the exact horizontal inset/width of the selector that ui_patch
-        # already laid out, but force the physical height to match Difficulty.
-        label.place(x=x, y=y, width=width, height=int(target_height))
-    else:
-        label.place(relx=0, x=14, y=y, relwidth=1, width=-28, height=int(target_height))
     return label
 
 
 def patched_show_start(self):
-    original_show_start(self)
+    """Simple natural-height New Run layout.
 
-    # Measure what Windows ACTUALLY rendered, not winfo_reqheight(). This is the
-    # key difference from v1.1.7 and makes the fix respect DPI/Tk font scaling.
-    try:
-        self.root.update_idletasks()
-        rendered_diff_heights = [
-            int(selector.winfo_height())
-            for _did, (_frame, selector, _color) in getattr(self, "_start_diff_widgets", {}).items()
-            if int(selector.winfo_height()) > 1
-        ]
-        selector_height = max(rendered_diff_heights) if rendered_diff_heights else 34
-    except (tk.TclError, ValueError):
-        selector_height = 34
+    v1.1.8 demonstrated that fixed-height cards plus post-layout geometry hacks
+    were fighting Tk rather than helping it. There is ample screen space, so the
+    entire screen now lets Tk size cards naturally. Difficulty and bank cards use
+    the exact same selector component and no widget is repositioned after draw.
+    """
+    self.screen = "new_run"
+    self.presentation_paused = True
+    self.clear(self.main)
+    self.clear(self.side)
+    self._menu_chrome("New Run")
 
-    new_diff = {}
-    for did, (frame, selector, color) in list(getattr(self, "_start_diff_widgets", {}).items()):
+    outer = tk.Frame(self.main, bg=M.BG, padx=50, pady=20)
+    outer.pack(fill="both", expand=True)
+
+    top = tk.Frame(outer, bg=M.BG)
+    top.pack(fill="x")
+    tk.Label(
+        top,
+        text="NEW RUN",
+        bg=M.BG,
+        fg=M.TEXT,
+        font=("Georgia", 28, "bold"),
+    ).pack(side="left")
+    self._menu_button(top, "BACK", self.show_main_menu, width=10).pack(side="right")
+
+    self._start_diff_widgets = {}
+    self._start_bank_widgets = {}
+
+    # Difficulty -----------------------------------------------------------
+    tk.Label(
+        outer,
+        text="DIFFICULTY",
+        bg=M.BG,
+        fg=M.ACCENT,
+        font=("Segoe UI", 10, "bold"),
+    ).pack(anchor="w", pady=(15, 7))
+
+    diff_row = tk.Frame(outer, bg=M.BG)
+    diff_row.pack(fill="x")
+    for col in range(3):
+        diff_row.grid_columnconfigure(col, weight=1, uniform="difficulty")
+
+    colors = {"easy": M.GOOD, "medium": M.ACCENT, "hard": M.BAD}
+    for col, did in enumerate(("easy", "medium", "hard")):
+        d = M.DIFFICULTIES[did]
         chosen = did == self.selected_difficulty
-        replacement = _replace_selector_at_rendered_geometry(
+        color = colors[did]
+        frame = tk.Frame(
+            diff_row,
+            bg=M.PANEL,
+            padx=14,
+            pady=11,
+            highlightbackground=color if chosen else "#3b3b42",
+            highlightthickness=2,
+        )
+        frame.grid(row=0, column=col, sticky="nsew", padx=4)
+
+        tk.Label(
             frame,
-            selector,
+            text=d.name.upper(),
+            bg=M.PANEL,
+            fg=color,
+            font=("Georgia", 14, "bold"),
+        ).pack(anchor="w")
+        timing = "Standard time" if d.time_delta == 0 else f"{d.time_delta:+.0f}s starting time"
+        plural = "s" if d.glyph_choices != 1 else ""
+        options = f"{d.glyph_choices} Glyph / {d.axiom_choices} Axiom option{plural}"
+        tk.Label(
+            frame,
+            text=f"{timing}  •  {options}",
+            bg=M.PANEL,
+            fg=M.MUTED,
+            font=("Segoe UI", 9),
+        ).pack(anchor="w", pady=(4, 9))
+
+        control = _selector(
+            frame,
             "SELECTED" if chosen else "SELECT",
             lambda x=did: self.select_difficulty(x),
             chosen,
             color,
-            selector_height,
         )
-        new_diff[did] = (frame, replacement, color)
-    self._start_diff_widgets = new_diff
+        control.pack(fill="x")
+        self._start_diff_widgets[did] = (frame, control, color)
 
-    new_banks = {}
-    for bid, (frame, title, selector) in list(getattr(self, "_start_bank_widgets", {}).items()):
-        chosen = bid == self.selected_bank_id
-        replacement = _replace_selector_at_rendered_geometry(
-            frame,
-            selector,
-            "SELECTED" if chosen else "SELECT",
-            lambda x=bid: self.select_word_bank(x),
-            chosen,
-            M.ACCENT,
-            selector_height,
-        )
-        new_banks[bid] = (frame, title, replacement)
-    self._start_bank_widgets = new_banks
+    # Word banks -----------------------------------------------------------
+    tk.Label(
+        outer,
+        text="WORD BANK",
+        bg=M.BG,
+        fg=M.ACCENT,
+        font=("Segoe UI", 10, "bold"),
+    ).pack(anchor="w", pady=(17, 7))
 
-    # Let parent rows react to any bank-card growth, then verify/enforce the
-    # physical selector height one more time after Tk has completed layout.
-    self.root.update_idletasks()
-    for _bid, (_frame, _title, selector) in self._start_bank_widgets.items():
-        try:
-            if int(selector.winfo_height()) != int(selector_height):
-                info = selector.place_info()
-                selector.place_configure(height=int(selector_height))
-        except tk.TclError:
-            pass
+    bank_items = list(M.BANKS.items())
+    bank_area = tk.Frame(outer, bg=M.BG)
+    bank_area.pack(fill="x")
+
+    for row_index, row_items in enumerate((bank_items[:3], bank_items[3:])):
+        row = tk.Frame(bank_area, bg=M.BG)
+        row.pack(fill="x", pady=(0, 8 if row_index == 0 else 0))
+        for col in range(len(row_items)):
+            row.grid_columnconfigure(col, weight=1, uniform=f"bank{row_index}")
+
+        for col, (bid, bdef) in enumerate(row_items):
+            chosen = bid == self.selected_bank_id
+            frame = tk.Frame(
+                row,
+                bg=M.PANEL,
+                padx=14,
+                pady=11,
+                highlightbackground=M.ACCENT if chosen else "#3b3b42",
+                highlightthickness=2,
+            )
+            frame.grid(row=0, column=col, sticky="nsew", padx=4)
+
+            title = tk.Label(
+                frame,
+                text=bdef.name.upper(),
+                bg=M.PANEL,
+                fg=M.ACCENT if chosen else M.TEXT,
+                font=("Segoe UI", 11, "bold"),
+            )
+            title.pack(anchor="w")
+
+            # Natural-height copy. Each row's grid automatically adopts the
+            # tallest card, while the selector stays at the bottom via pack().
+            tk.Label(
+                frame,
+                text=bdef.description,
+                bg=M.PANEL,
+                fg="#c7c7cd",
+                wraplength=520,
+                justify="left",
+                anchor="nw",
+                font=("Segoe UI", 10),
+            ).pack(anchor="w", fill="x", pady=(5, 3))
+            tk.Label(
+                frame,
+                text=f"Examples: {BANK_EXAMPLES.get(bid, '')}",
+                bg=M.PANEL,
+                fg=M.ACCENT,
+                wraplength=520,
+                justify="left",
+                font=("Segoe UI", 8, "bold"),
+            ).pack(anchor="w", pady=(0, 9))
+
+            control = _selector(
+                frame,
+                "SELECTED" if chosen else "SELECT",
+                lambda x=bid: self.select_word_bank(x),
+                chosen,
+                M.ACCENT,
+            )
+            control.pack(side="bottom", fill="x")
+            self._start_bank_widgets[bid] = (frame, title, control)
+
+    # Seed + start ---------------------------------------------------------
+    setup = tk.Frame(
+        outer,
+        bg=M.PANEL,
+        padx=18,
+        pady=13,
+        highlightbackground="#3b3b42",
+        highlightthickness=1,
+    )
+    setup.pack(fill="x", pady=(16, 13))
+    inner = tk.Frame(setup, bg=M.PANEL)
+    inner.pack(anchor="center")
+    tk.Label(
+        inner,
+        text="Seed (optional)",
+        bg=M.PANEL,
+        fg=M.TEXT,
+        font=("Segoe UI", 10, "bold"),
+    ).pack(side="left", padx=(0, 12))
+    self.seed_entry = tk.Entry(
+        inner,
+        bg=M.PANEL2,
+        fg=M.TEXT,
+        insertbackground=M.TEXT,
+        relief="flat",
+        width=32,
+        font=("Consolas", 10),
+    )
+    self.seed_entry.pack(side="left", ipady=7, padx=(0, 14))
+    tk.Label(
+        inner,
+        text="Same setup + seed reproduces the same rolls.",
+        bg=M.PANEL,
+        fg=M.MUTED,
+        font=("Segoe UI", 9),
+    ).pack(side="left")
+
+    actions = tk.Frame(outer, bg=M.BG)
+    actions.pack(fill="x")
+    start = tk.Button(
+        actions,
+        text="START RUN",
+        command=self.new_run,
+        bg=M.ACCENT,
+        fg=M.BG,
+        activebackground="#e7be72",
+        activeforeground=M.BG,
+        relief="flat",
+        bd=0,
+        highlightthickness=0,
+        takefocus=0,
+        padx=36,
+        pady=14,
+        width=26,
+        font=("Segoe UI", 13, "bold"),
+        cursor="hand2",
+    )
+    start.pack(anchor="center")
     self._refresh_start_selection()
 
 
 def patched_show_boss_intro(self):
     original_show_boss_intro(self)
-    # The Forbidden's identity must not be spoiled by the pre-Boss screen.
     if not self.game or not self.game.round or self.game.round.boss_id != "forbidden":
         return
     for widget in list(_walk(self.main)):
@@ -188,9 +328,6 @@ def patched_show_tutorial(self, page=0):
 
 
 def patched_can_guess_letter(game, ch):
-    # Let the existing Forbidden validation reject the letter, but remember that
-    # the player has discovered its identity. No guessed-letter or mistake state
-    # is changed, so the probing attempt remains harmless.
     letter = str(ch).lower()
     if (
         game.status == "playing"
