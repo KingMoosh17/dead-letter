@@ -1,4 +1,4 @@
-# Dead Letter v1.1.2
+# Dead Letter v1.1.3
 
 A timed Hangman roguelike. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
 
@@ -6,7 +6,7 @@ A timed Hangman roguelike. Solve increasingly difficult words, build around pass
 
 On Windows, double-click **`DeadLetter.exe`**. The public build is standalone and does not require a separate Python installation.
 
-The repository still includes the Python source for development and debugging.
+The repository also includes the Python source for development and debugging.
 
 ## Core rules
 
@@ -29,23 +29,11 @@ All difficulties use six base mistakes.
 
 Five large pools can be selected for each run:
 
-- **Standard:** the full balanced lexicon, ranging from familiar to obscure vocabulary (~35k words).
+- **Standard:** the full balanced lexicon, ranging from familiar to obscure vocabulary.
 - **Common Tongue:** leans toward familiar everyday words and cleaner spellings.
 - **Longform:** leans toward longer, less-common vocabulary and denser spellings.
 - **Quickfire:** favors compact short/mid-length words where each reveal carries less information.
 - **Labyrinth:** favors unusual spelling, rare letters, awkward vowel structures, and deceptive patterns.
-
-The four alternate pools contain ~28,000 words each and intentionally overlap with Standard so they remain viable in long Endless runs.
-
-## Content
-
-- 96 Glyphs
-- 31 Axioms
-- 16 Bosses before the Boss pool repeats
-- 5 word banks
-- Easy / Medium / Hard
-- Endless mode
-- Compendium, persistent stats, tutorial, sound, display options, and reduced motion
 
 ## Controls
 
@@ -68,6 +56,8 @@ They are kept outside the installation folder so game updates do not overwrite t
 
 ## Updates
 
-The game checks the configured public GitHub Releases feed. When a newer release is available, an **Update to vX.Y.Z** button appears on the main menu. Updates preserve settings, stats, and telemetry. A saved Continue Run must be discarded before updating, and the game asks for confirmation first.
+Dead Letter checks the public `KingMoosh17/dead-letter` GitHub Releases feed. The player does **not** need a GitHub account or login. When a newer release is available, an **Update to vX.Y.Z** button appears on the main menu.
 
-Public releases include a standalone `DeadLetterUpdater.exe`, allowing executable builds to update themselves without requiring Python.
+Updates keep the installation path and the `DeadLetter.exe` filename stable, so a normal Windows shortcut to the executable continues to work after in-place updates. Settings, stats, and telemetry are preserved. A saved Continue Run must be discarded before updating, and the game asks for confirmation first.
+
+Public releases include a standalone `DeadLetterUpdater.exe`; it has a deliberately different icon from the main game executable.
