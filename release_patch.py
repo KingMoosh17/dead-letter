@@ -43,40 +43,95 @@ def _replace_player_facing_definitions():
     )
 
 
+def _replace_selector(frame, old_selector, text, command, selected, accent, height):
+    """Replace a geometry-dependent selector with an exact-height control.
+
+    Tk's packer can squeeze a normal Label when a fixed-height card runs out of
+    vertical room. A non-propagating holder reserves the selector's pixels first,
+    and the clickable label fills that holder with place(), so difficulty and
+    word-bank selectors are guaranteed to render at the same height.
+    """
+    try:
+        old_selector.pack_forget()
+        old_selector.destroy()
+    except tk.TclError:
+        pass
+
+    bg = accent if selected else M.PANEL2
+    fg = M.BG if selected else M.TEXT
+    holder = tk.Frame(frame, bg=bg, height=height, bd=0, highlightthickness=0)
+    holder.pack(side="bottom", fill="x")
+    holder.pack_propagate(False)
+
+    label = tk.Label(
+        holder,
+        text=text,
+        bg=bg,
+        fg=fg,
+        font=("Segoe UI", 9, "bold"),
+        cursor="hand2",
+        anchor="center",
+        bd=0,
+        highlightthickness=0,
+    )
+    label.place(x=0, y=0, relwidth=1, relheight=1)
+    label.bind("<Button-1>", lambda _e: command())
+    return label
+
+
 def patched_show_start(self):
     original_show_start(self)
 
-    # Word-bank cards have a fixed height. The selector used to be packed after
-    # all of the descriptive text, so Tk could squeeze the last-packed widget to
-    # whatever vertical space happened to remain. Repack each card with the
-    # selector FIRST on the bottom, which reserves exactly the same requested
-    # selector height used by the difficulty cards before laying out the copy.
-    for _bid, (frame, _title, selector) in getattr(self, "_start_bank_widgets", {}).items():
+    # v1.1.7: use one fixed-height selector component for BOTH sections.
+    # This is intentionally not a padding tweak: both difficulty and word-bank
+    # selectors now sit in identical non-propagating holders, so card contents
+    # cannot compress one set independently of the other.
+    try:
+        self.root.update_idletasks()
+        requested = [
+            selector.winfo_reqheight()
+            for _did, (_frame, selector, _color) in getattr(self, "_start_diff_widgets", {}).items()
+        ]
+        selector_height = max([34, *requested])
+    except tk.TclError:
+        selector_height = 34
+
+    new_diff = {}
+    for did, (frame, selector, color) in list(getattr(self, "_start_diff_widgets", {}).items()):
+        chosen = did == self.selected_difficulty
+        replacement = _replace_selector(
+            frame,
+            selector,
+            "SELECTED" if chosen else "SELECT",
+            lambda x=did: self.select_difficulty(x),
+            chosen,
+            color,
+            selector_height,
+        )
+        new_diff[did] = (frame, replacement, color)
+    self._start_diff_widgets = new_diff
+
+    new_banks = {}
+    for bid, (frame, title, selector) in list(getattr(self, "_start_bank_widgets", {}).items()):
+        chosen = bid == self.selected_bank_id
+        # Give the copy enough room that examples do not get hidden behind the
+        # now-reserved selector, while keeping the cards compact.
         try:
-            packed = []
-            for child in frame.winfo_children():
-                if child.winfo_manager() == "pack":
-                    packed.append((child, child.pack_info()))
-            for child, _info in packed:
-                child.pack_forget()
-
-            selector.config(font=("Segoe UI", 9, "bold"), pady=6)
-            selector_info = next((info for child, info in packed if child is selector), None)
-            if selector_info is not None:
-                selector.pack(**selector_info)
-            else:
-                selector.pack(side="bottom", fill="x")
-
-            for child, info in packed:
-                if child is selector:
-                    continue
-                child.pack(**info)
-        except (tk.TclError, StopIteration):
-            # Fallback for any platform-specific Tk geometry quirk.
-            try:
-                selector.config(font=("Segoe UI", 9, "bold"), pady=6)
-            except tk.TclError:
-                pass
+            frame.config(height=134)
+        except tk.TclError:
+            pass
+        replacement = _replace_selector(
+            frame,
+            selector,
+            "SELECTED" if chosen else "SELECT",
+            lambda x=bid: self.select_word_bank(x),
+            chosen,
+            M.ACCENT,
+            selector_height,
+        )
+        new_banks[bid] = (frame, title, replacement)
+    self._start_bank_widgets = new_banks
+    self._refresh_start_selection()
 
 
 def patched_show_boss_intro(self):
