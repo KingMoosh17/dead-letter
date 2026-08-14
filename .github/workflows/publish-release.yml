@@ -47,7 +47,7 @@ jobs:
         run: |
           $required = @(
             "main.py", "game_logic.py", "effects.py", "content.py", "wordbank.py",
-            "sound.py", "storage.py", "telemetry.py", "ui_patch.py", "release_patch.py",
+            "sound.py", "storage.py", "telemetry.py", "ui_patch.py", "release_patch.py", "chapter_patch.py",
             "update_manager.py", "updater.py", "DeadLetter.pyw", "build_icon.py",
             "VERSION.txt", "update_config.json", "data/words.csv"
           )
@@ -62,7 +62,7 @@ jobs:
       - name: Syntax check release modules
         shell: pwsh
         run: |
-          python -m py_compile ui_patch.py release_patch.py update_manager.py updater.py DeadLetter.pyw build_icon.py
+          python -m py_compile ui_patch.py release_patch.py chapter_patch.py update_manager.py updater.py DeadLetter.pyw build_icon.py
           python -c "import content, wordbank, storage; print('Source imports OK')"
 
       - name: Generate application icons
@@ -103,7 +103,7 @@ jobs:
           $sourceFiles = @(
             "DeadLetter.pyw", "main.py", "game_logic.py", "effects.py", "content.py",
             "wordbank.py", "sound.py", "storage.py", "telemetry.py",
-            "ui_patch.py", "release_patch.py", "update_manager.py", "updater.py"
+            "ui_patch.py", "release_patch.py", "chapter_patch.py", "update_manager.py", "updater.py"
           )
           foreach ($file in $sourceFiles) { Copy-Item $file "$pkg\$file" }
           Copy-Item "data\words.csv" "$pkg\data\words.csv"
