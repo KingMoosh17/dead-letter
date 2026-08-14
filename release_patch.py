@@ -1,4 +1,4 @@
-"""Dead Letter v1.1.5 targeted release fixes.
+"""Dead Letter targeted release fixes.
 
 Applied after ui_patch.py so small gameplay/UI hotfixes can ship without
 rewriting the larger presentation module.
@@ -22,8 +22,8 @@ def _walk(widget):
 
 
 def _replace_player_facing_definitions():
-    # The Forbidden now hides the identity of its blocked present letter until
-    # the player actually tries it. That blocked attempt itself is harmless.
+    # The Forbidden hides the identity of its blocked present letter until the
+    # player actually tries it. That blocked attempt itself is harmless.
     BOSSES["forbidden"] = BossDef(
         "forbidden",
         "The Forbidden",
@@ -45,12 +45,38 @@ def _replace_player_facing_definitions():
 
 def patched_show_start(self):
     original_show_start(self)
-    # Match bank selectors exactly to the difficulty selector typography/height.
-    for _bid, (_frame, _title, selector) in getattr(self, "_start_bank_widgets", {}).items():
+
+    # Word-bank cards have a fixed height. The selector used to be packed after
+    # all of the descriptive text, so Tk could squeeze the last-packed widget to
+    # whatever vertical space happened to remain. Repack each card with the
+    # selector FIRST on the bottom, which reserves exactly the same requested
+    # selector height used by the difficulty cards before laying out the copy.
+    for _bid, (frame, _title, selector) in getattr(self, "_start_bank_widgets", {}).items():
         try:
+            packed = []
+            for child in frame.winfo_children():
+                if child.winfo_manager() == "pack":
+                    packed.append((child, child.pack_info()))
+            for child, _info in packed:
+                child.pack_forget()
+
             selector.config(font=("Segoe UI", 9, "bold"), pady=6)
-        except tk.TclError:
-            pass
+            selector_info = next((info for child, info in packed if child is selector), None)
+            if selector_info is not None:
+                selector.pack(**selector_info)
+            else:
+                selector.pack(side="bottom", fill="x")
+
+            for child, info in packed:
+                if child is selector:
+                    continue
+                child.pack(**info)
+        except (tk.TclError, StopIteration):
+            # Fallback for any platform-specific Tk geometry quirk.
+            try:
+                selector.config(font=("Segoe UI", 9, "bold"), pady=6)
+            except tk.TclError:
+                pass
 
 
 def patched_show_boss_intro(self):
