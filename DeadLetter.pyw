@@ -25,6 +25,9 @@ def _launch():
     import storage
     storage.GAME_VERSION = VERSION
 
+    import telemetry
+    telemetry.GAME_VERSION = VERSION
+
     import main
     main.GAME_VERSION = VERSION
 
