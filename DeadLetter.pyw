@@ -1,8 +1,8 @@
 """Dead Letter public launcher.
 
 When a packaged executable is present, source-mode double-clicks hand off to it.
-The frozen executable runs the same module directly and applies the v1.1.2
-presentation patch before constructing the Tkinter app.
+The frozen executable runs the same module directly and applies the current
+release presentation patch before constructing the Tkinter app.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 
 
 def _launch():
