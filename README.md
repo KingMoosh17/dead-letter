@@ -1,4 +1,4 @@
-# Dead Letter v1.1.10
+# Dead Letter v1.1.11
 
 A timed Hangman roguelike. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
 
@@ -37,6 +37,10 @@ Five large pools can be selected for each run:
 - **Longform:** leans toward longer, less-common vocabulary and denser spellings.
 - **Quickfire:** favors compact short/mid-length words where each reveal carries less information.
 - **Labyrinth:** favors unusual spelling, rare letters, awkward vowel structures, and deceptive patterns.
+
+## Balance philosophy
+
+Glyphs and Axioms should occupy distinct niches rather than act as strictly weaker copies of one another. v1.1.11 specifically rebalanced several dominated Information, Time, Economy, and Boss-specialist effects while leaving the overall difficulty curve unchanged.
 
 ## Controls
 
