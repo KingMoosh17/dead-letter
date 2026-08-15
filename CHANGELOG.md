@@ -1,3 +1,33 @@
+# Dead Letter v1.1.11
+
+## Dominance balance pass
+- Re-audited the full Glyph and Axiom pools for effects that were effectively weaker copies of another choice rather than genuinely different niches.
+- **Thesaurus:** now starts at 1 absent-letter cross-out and scales to 7 total; every 3 pages still adds +1.
+- **Index Cards:** now starts at 2 cross-outs and scales to 6 total, adding +1 every 4 solved words.
+- **Process of Elimination:** now crosses out 2 absent letters every 2 manual correct guesses.
+- **Steady Hand:** its delayed second-correct trigger now crosses out 5 absent letters.
+- **Pressure Notes:** its half-timer trigger now crosses out 6 absent letters.
+- **Momentum:** now restores 1.5s per manual correct letter, up to 10.5s per word.
+- **Stopwatch:** now restores 5s every third manual correct letter.
+- **Chain Reaction:** now restores 7s every three consecutive manual correct letters.
+- **Consonant Clock:** now restores 2s per correct consonant, up to 10s per word.
+- **Second Wind:** its first multi-copy reveal now restores 8s.
+- **Cash Flow:** now earns 100 Points per manual correct letter, making it stronger on single-copy hits while Letterpress remains stronger on repeated letters.
+- **Loaded Dice:** paid rerolls now have a 50% full-refund chance, giving it higher expected value than the deterministic Common Frugal while retaining variance.
+- **Market Maker:** redesigned into a true Boss economy scaler. It begins at 10% of held Points after each Boss, rises by 2 percentage points per Boss defeated while owned, caps at 20%, and has a 1,200-Point payout cap.
+
+## Axiom specialization
+- **Overtime:** +7 starting seconds with x0.94 score instead of being a smaller, penalized Grace Period.
+- **Boss Insurance:** +2 mistake capacity on Boss words instead of being a strict subset of Margin for Error.
+- **Preparation:** 5 absent-letter cross-outs at Boss start instead of being a strict subset of Annotations.
+- **Footnotes:** 5 absent-letter cross-outs after the first wrong guess instead of a delayed copy of Annotations.
+- **Long Game:** now gains +0.75 starting seconds per completed Chapter, up to +9s, so it begins paying off during the main run while retaining its Endless identity.
+
+## Consistency
+- Corrected the No Vowels score implementation to its displayed x1.35 multiplier.
+- Removed the remaining player-facing uses of the old `charged mistake` terminology from Streak Mark and Snowball.
+- Chapter Preview time estimates use the new Overtime and Long Game values.
+
 # Dead Letter v1.1.10
 
 ## Chapter previews
