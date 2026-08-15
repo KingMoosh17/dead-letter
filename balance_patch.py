@@ -172,6 +172,22 @@ def patched_on_correct_letter(game, ctx):
             effects._eliminate(game, 5)
 
 
+def patched_on_wrong_action(game, ctx):
+    # Annotations gives two guaranteed cross-outs at word start. Footnotes now
+    # waits for a mistake, but pays much more strongly when that recovery trigger
+    # is actually needed.
+    with _hide(game, axioms={"footnotes"}):
+        original_on_wrong_action(game, ctx)
+    r = game.round
+    if (
+        r is not None
+        and game.has_axiom("footnotes")
+        and not getattr(r, "footnotes_used", False)
+    ):
+        r.footnotes_used = True
+        effects._eliminate(game, 5)
+
+
 def patched_tick(game, dt):
     # Pressure Notes used to be a delayed, smaller Alphabetizer. Suppress the
     # old 3-letter trigger and apply the stronger delayed payoff instead.
@@ -352,7 +368,7 @@ def patched_preview_glyph_time(game, first_round):
 
 
 def apply_patch(main_module):
-    global original_on_round_started, original_on_correct_letter, original_after_solve
+    global original_on_round_started, original_on_correct_letter, original_on_wrong_action, original_after_solve
     global original_tick, original_starting_time_delta, original_score_multiplier
     global original_base_time_for_round, original_start_round, original_reroll_glyphs
     global original_init_glyph_state, original_clear_glyph_state, original_glyph_description
@@ -362,6 +378,7 @@ def apply_patch(main_module):
 
     original_on_round_started = effects.on_round_started
     original_on_correct_letter = effects.on_correct_letter
+    original_on_wrong_action = effects.on_wrong_action
     original_after_solve = effects.after_solve
     original_starting_time_delta = effects.starting_time_delta
     original_score_multiplier = effects.score_multiplier
@@ -375,6 +392,7 @@ def apply_patch(main_module):
 
     effects.on_round_started = patched_on_round_started
     effects.on_correct_letter = patched_on_correct_letter
+    effects.on_wrong_action = patched_on_wrong_action
     effects.after_solve = patched_after_solve
     effects.starting_time_delta = patched_starting_time_delta
     effects.score_multiplier = patched_score_multiplier
