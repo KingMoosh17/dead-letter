@@ -2,7 +2,7 @@
 
 When a packaged executable is present, source-mode double-clicks hand off to it.
 The frozen executable runs the same module directly and applies the current
-release presentation patches before constructing the Tkinter app.
+release presentation and balance patches before constructing the Tkinter app.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.1.10"
+VERSION = "1.1.11"
 
 
 def _launch():
@@ -39,6 +39,9 @@ def _launch():
 
     from chapter_patch import apply_patch as apply_chapter_patch
     apply_chapter_patch(main)
+
+    from balance_patch import apply_patch as apply_balance_patch
+    apply_balance_patch(main)
 
     main.main()
 
