@@ -20,6 +20,7 @@ SCHEMA_VERSION = 1
 CONSENT_VERSION = 1
 MAX_QUEUE_EVENTS = 2000
 BATCH_SIZE = 25
+MAX_BATCHES_PER_FLUSH = 8
 
 _lock = threading.Lock()
 _worker_lock = threading.Lock()
@@ -113,28 +114,44 @@ def enqueue_event(data_dir: Path, event_type: str, payload: dict) -> None:
     start_flush(data_dir)
 
 
-def _load_batch(path: Path) -> tuple[list[dict], list[str]]:
+def _load_batch(path: Path) -> list[dict]:
     try:
         with _lock:
             lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
         batch = []
-        consumed = 0
-        for line in lines[:BATCH_SIZE]:
+        for line in lines:
+            if len(batch) >= BATCH_SIZE:
+                break
             try:
-                batch.append(json.loads(line))
-                consumed += 1
+                event = json.loads(line)
             except (json.JSONDecodeError, TypeError):
-                consumed += 1
-        return batch, lines[consumed:]
+                continue
+            if isinstance(event, dict) and event.get("event_id"):
+                batch.append(event)
+        return batch
     except OSError:
-        return [], []
+        return []
 
 
-def _save_remaining(path: Path, remaining: list[str]) -> None:
+def _remove_uploaded(path: Path, uploaded: list[dict]) -> None:
+    """Remove only events confirmed uploaded, preserving events appended meanwhile."""
+    uploaded_ids = {str(event.get("event_id")) for event in uploaded if event.get("event_id")}
+    if not uploaded_ids:
+        return
     try:
         with _lock:
+            current = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+            kept = []
+            for line in current:
+                try:
+                    event = json.loads(line)
+                except (json.JSONDecodeError, TypeError):
+                    # Drop malformed queue records during normal cleanup.
+                    continue
+                if str(event.get("event_id", "")) not in uploaded_ids:
+                    kept.append(json.dumps(event, separators=(",", ":"), ensure_ascii=True))
             tmp = path.with_suffix(".tmp")
-            tmp.write_text(("\n".join(remaining) + "\n") if remaining else "", encoding="utf-8")
+            tmp.write_text(("\n".join(kept) + "\n") if kept else "", encoding="utf-8")
             tmp.replace(path)
     except OSError:
         pass
@@ -165,13 +182,17 @@ def flush_once(data_dir: Path) -> None:
     if not sharing_enabled(data_dir):
         return
     path = _queue_path(data_dir)
-    batch, remaining = _load_batch(path)
-    if not batch:
-        if remaining == [] and path.exists():
-            _save_remaining(path, [])
-        return
-    if _post_batch(batch):
-        _save_remaining(path, remaining)
+    for _ in range(MAX_BATCHES_PER_FLUSH):
+        if not sharing_enabled(data_dir):
+            return
+        batch = _load_batch(path)
+        if not batch:
+            return
+        if not _post_batch(batch):
+            return
+        _remove_uploaded(path, batch)
+        if len(batch) < BATCH_SIZE:
+            return
 
 
 def start_flush(data_dir: Path | None) -> None:
