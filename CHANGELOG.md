@@ -1,3 +1,24 @@
+# Dead Letter v1.1.12
+
+## Telemetry-driven Endless fix
+- Investigated a 89-word Standard/Medium run that reached Chapter 23. The run was **not Quickfire**.
+- In that run, average word length fell from 8.63 before Endless to 4.84 in Endless; at target Complexity 9.5+, every sampled word was 5 letters or shorter.
+- Complexity remains the primary selector. In Endless, Standard, Common Tongue, Longform, and Labyrinth now choose among short/medium/long candidate buckets *after* filtering to the valid Complexity band, with light recent-length anti-streak weighting.
+- Short high-Complexity words remain valid; the change prevents candidate-count imbalance at the extreme top of the scale from turning non-Quickfire Endless into an accidental short-word mode.
+- Quickfire intentionally keeps its compact-word selection behavior.
+- Recent word-length history is saved with the run so safe-screen Continue Run remains consistent.
+
+## Information Saturation
+- The same telemetry run ended with essentially every absent letter crossed out on most Endless words, making a sufficiently stacked information build practically unable to miss.
+- Added a global **Information Saturation** rule: automatic Glyph/Axiom cross-outs stop once 8 unguessed absent letters remain.
+- Manual wrong guesses can still account for letters below that floor because the player paid a mistake for the information.
+- Individual information Glyphs keep their v1.1.11 values; the shared floor creates natural diminishing returns when many of them are stacked instead of nerfing each one in isolation.
+- Added the rule to How to Play.
+
+## Precision & run information
+- **Precision** is no longer a weaker Process of Elimination. Every 3 consecutive manual correct letter guesses now earns +350 Points and restores 3 seconds.
+- The normal run header now always displays **Difficulty • Word Bank • Seed**, making the selected bank directly checkable during play.
+
 # Dead Letter v1.1.11
 
 ## Dominance balance pass
