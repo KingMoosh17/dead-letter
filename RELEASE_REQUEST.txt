@@ -1,1 +1,1 @@
-1.1.13 final telemetry build
+1.1.13 final
