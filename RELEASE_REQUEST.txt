@@ -1,1 +1,1 @@
-1.1.13 telemetry-sharing release
+1.1.13 final telemetry build
