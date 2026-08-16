@@ -16,6 +16,8 @@ def _save_remote_setting(app, enabled: bool) -> None:
     app.storage.save_settings()
     if enabled:
         online_telemetry.start_flush(app.storage.root)
+    else:
+        online_telemetry.discard_queue(app.storage.root)
 
 
 def _ask_consent(app) -> None:
@@ -86,7 +88,7 @@ def patched_show_settings(self):
             card,
             text=(
                 "Sends run-scoped gameplay telemetry only. No name, email, account, or persistent device/player ID. "
-                "Requires Local play telemetry above to be enabled. Changes here are saved immediately."
+                "Requires Local play telemetry above to be enabled. Turning sharing off also deletes any unsent upload queue."
             ),
             bg=M.PANEL,
             fg="#77777e",
