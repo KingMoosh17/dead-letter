@@ -1,4 +1,4 @@
-# Dead Letter v1.1.11
+# Dead Letter v1.1.12
 
 A timed Hangman roguelike. Solve increasingly difficult words, build around passive Glyphs, earn permanent Axioms from Bosses, clear Chapter 8, then continue into Endless.
 
@@ -17,6 +17,7 @@ The repository also includes the Python source for development and debugging.
 - Bosses award permanent Axioms.
 - Beat Chapter 8 to win; Endless continues until defeat.
 - Word Complexity is a Hangman-focused 1–10 rating rather than a length score.
+- **Information Saturation:** automatic Glyph/Axiom cross-outs stop once 8 unguessed absent letters remain. Wrong guesses can still account for those letters normally.
 
 Protection can reduce a mistake before it reaches the meter. Internally telemetry distinguishes an attempted penalty from a mistake that actually counts, but player-facing rules refer to the meter directly.
 
@@ -38,9 +39,11 @@ Five large pools can be selected for each run:
 - **Quickfire:** favors compact short/mid-length words where each reveal carries less information.
 - **Labyrinth:** favors unusual spelling, rare letters, awkward vowel structures, and deceptive patterns.
 
+The selected word bank is displayed in the run header alongside difficulty and seed. In Endless, non-Quickfire banks preserve their identities with length-bucket diversity inside the valid Complexity band, preventing extreme high-Complexity pools from degenerating into a long sequence of nearly identical short-word targets. Quickfire intentionally retains its compact-word bias.
+
 ## Balance philosophy
 
-Glyphs and Axioms should occupy distinct niches rather than act as strictly weaker copies of one another. v1.1.11 specifically rebalanced several dominated Information, Time, Economy, and Boss-specialist effects while leaving the overall difficulty curve unchanged.
+Glyphs and Axioms should occupy distinct niches rather than act as strictly weaker copies of one another. Information builds are allowed to become extremely strong, but automatic cross-outs now have a shared saturation point so stacking many information effects cannot make every remaining enabled letter a guaranteed hit.
 
 ## Controls
 
