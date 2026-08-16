@@ -1,0 +1,83 @@
+name: Publish Dead Letter to itch.io
+
+on:
+  workflow_run:
+    workflows: ["Publish Dead Letter Release"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dead-letter-itch-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve latest GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)"
+          version="${tag#v}"
+          asset="Dead_Letter_v${version}.zip"
+          mkdir -p release_asset
+          gh release download "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$asset" \
+            --dir release_asset
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+          echo "Resolved $tag ($asset)"
+
+      - name: Install itch.io butler
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/butler.zip"
+          install_dir="$RUNNER_TEMP/butler"
+          curl -fsSL \
+            "https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default" \
+            -o "$archive"
+          mkdir -p "$install_dir"
+          unzip -q "$archive" -d "$install_dir"
+          butler_bin="$(find "$install_dir" -type f -name butler -print -quit)"
+          if [ -z "$butler_bin" ]; then
+            echo "butler executable was not found after extraction" >&2
+            exit 1
+          fi
+          chmod +x "$butler_bin"
+          echo "BUTLER_BIN=$butler_bin" >> "$GITHUB_ENV"
+          "$butler_bin" version
+
+      - name: Push Windows build to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          BUTLER_PUSH_SOURCE: github-actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${BUTLER_API_KEY:-}" ]; then
+            echo "Missing BUTLER_API_KEY repository secret." >&2
+            exit 1
+          fi
+          "$BUTLER_BIN" push \
+            "release_asset/$ASSET" \
+            "legacy0417/dead-letter:windows" \
+            --userversion "$VERSION" \
+            --if-changed
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "Published $TAG to legacy0417/dead-letter:windows on itch.io." >> "$GITHUB_STEP_SUMMARY"
+          echo "User version: $VERSION" >> "$GITHUB_STEP_SUMMARY"
