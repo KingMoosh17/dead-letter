@@ -29,15 +29,18 @@ jobs:
           tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)"
           version="${tag#v}"
           asset="Dead_Letter_v${version}.zip"
-          mkdir -p release_asset
+          mkdir -p release_asset build_dir
           gh release download "$tag" \
             --repo "$GITHUB_REPOSITORY" \
             --pattern "$asset" \
             --dir release_asset
+          unzip -q "release_asset/$asset" -d build_dir
+          test -f build_dir/DeadLetter.exe
+          test -f build_dir/DeadLetterUpdater.exe
           echo "VERSION=$version" >> "$GITHUB_ENV"
           echo "TAG=$tag" >> "$GITHUB_ENV"
           echo "ASSET=$asset" >> "$GITHUB_ENV"
-          echo "Resolved $tag ($asset)"
+          echo "Resolved and extracted $tag ($asset)"
 
       - name: Install itch.io butler
         shell: bash
@@ -71,7 +74,7 @@ jobs:
             exit 1
           fi
           "$BUTLER_BIN" push \
-            "release_asset/$ASSET" \
+            build_dir \
             "legacy0417/dead-letter:windows" \
             --userversion "$VERSION" \
             --if-changed
