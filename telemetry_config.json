@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "backend": "supabase",
+  "project_ref": "qlodkitflnklidbrwjkc",
+  "table": "telemetry_events",
+  "event_types": ["round", "decision", "run_event"]
+}
