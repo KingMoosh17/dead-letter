@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.1.12"
+VERSION = "1.1.13"
 
 
 def _launch():
@@ -45,6 +45,9 @@ def _launch():
 
     from system_patch import apply_patch as apply_system_patch
     apply_system_patch(main)
+
+    from privacy_patch import apply_patch as apply_privacy_patch
+    apply_privacy_patch(main)
 
     main.main()
 
