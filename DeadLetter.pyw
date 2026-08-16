@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "1.1.11"
+VERSION = "1.1.12"
 
 
 def _launch():
@@ -42,6 +42,9 @@ def _launch():
 
     from balance_patch import apply_patch as apply_balance_patch
     apply_balance_patch(main)
+
+    from system_patch import apply_patch as apply_system_patch
+    apply_system_patch(main)
 
     main.main()
 
