@@ -22,7 +22,7 @@ Online sharing is **off until the player explicitly opts in**. If enabled, Dead 
 
 Dead Letter does not intentionally send a player's name, email address, account information, personal files, or a persistent device/player identifier. Events contain a run ID used only to connect events from the same individual run.
 
-Online sharing can be disabled at any time in Settings. Disabling it stops new uploads. Network failures do not interrupt gameplay; locally queued events may be retried later while sharing remains enabled.
+Online sharing can be disabled at any time in Settings. Disabling it stops new uploads and deletes any unsent online-upload queue stored on the computer. Network failures do not interrupt gameplay; queued events are retried only while sharing remains enabled.
 
 ## Purpose
 
