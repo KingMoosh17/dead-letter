@@ -47,7 +47,7 @@ jobs:
         run: |
           $required = @(
             "main.py", "game_logic.py", "effects.py", "content.py", "wordbank.py",
-            "sound.py", "storage.py", "telemetry.py", "ui_patch.py", "release_patch.py", "chapter_patch.py", "balance_patch.py",
+            "sound.py", "storage.py", "telemetry.py", "ui_patch.py", "release_patch.py", "chapter_patch.py", "balance_patch.py", "system_patch.py",
             "update_manager.py", "updater.py", "DeadLetter.pyw", "build_icon.py",
             "VERSION.txt", "update_config.json", "data/words.csv"
           )
@@ -59,22 +59,27 @@ jobs:
         shell: pwsh
         run: python -m pip install --disable-pip-version-check pyinstaller pillow
 
-      - name: Syntax, chapter-flow, and balance checks
+      - name: Syntax, chapter-flow, and systemic balance checks
         shell: pwsh
         run: |
-          python -m py_compile ui_patch.py release_patch.py chapter_patch.py balance_patch.py update_manager.py updater.py DeadLetter.pyw build_icon.py
+          python -m py_compile ui_patch.py release_patch.py chapter_patch.py balance_patch.py system_patch.py update_manager.py updater.py DeadLetter.pyw build_icon.py
           python -c "import content, wordbank, storage; print('Source imports OK')"
           @'
+          import random
+          from types import SimpleNamespace
+
           import main
-          import ui_patch, release_patch, chapter_patch, balance_patch
+          import ui_patch, release_patch, chapter_patch, balance_patch, system_patch
+          import effects
           from content import GLYPHS, AXIOMS
-          from wordbank import WordBank
+          from wordbank import WordBank, WordEntry
           from game_logic import GameState
 
           ui_patch.apply_patch(main)
           release_patch.apply_patch(main)
           chapter_patch.apply_patch(main)
           balance_patch.apply_patch(main)
+          system_patch.apply_patch(main)
 
           bank = WordBank('data/words.csv', 'standard')
 
@@ -90,6 +95,7 @@ jobs:
           del game._chapter_preview_entering
           assert game.status == 'playing', game.status
           assert game.round is not None
+          assert game.word_length_history[-1] == game.round.word.length
 
           game.round_index = 4
           game.round = None
@@ -98,13 +104,68 @@ jobs:
           assert game.status == 'chapter_ready', game.status
           assert game.chapter == 2
 
-          # Clear dominance fixes are present in the public definitions.
+          # v1.1.11 dominance fixes remain intact.
           assert 'up to 7 total' in GLYPHS['thesaurus'].description
           assert 'up to 6 total' in GLYPHS['index_cards'].description
           assert '+7 seconds' in AXIOMS['overtime'].description
           assert '+2 mistake capacity' in AXIOMS['boss_insurance'].description
           assert '5 absent letters' in AXIOMS['preparation'].description
           assert '5 absent letters' in AXIOMS['footnotes'].description
+
+          # Precision is no longer another weaker cross-out engine.
+          assert '+350 Points' in GLYPHS['precision'].description
+          assert 'restore 3 seconds' in GLYPHS['precision'].description
+          assert 'cross' not in GLYPHS['precision'].description.lower()
+
+          # Information Saturation leaves eight unguessed absent letters even
+          # when a stack requests far more automatic cross-outs than exist.
+          fake_word = SimpleNamespace(word='abc')
+          fake_round = SimpleNamespace(
+              word=fake_word,
+              guessed_letters=set(),
+              eliminated_letters=set(),
+              information_saturated=False,
+          )
+          fake_game = SimpleNamespace(round=fake_round, rng=random.Random(1))
+          picked = effects._eliminate(fake_game, 99)
+          assert len(picked) == 15, len(picked)  # 23 absent - 8 protected
+          assert len(set(effects.ALPHABET) - set(fake_word.word) - fake_round.eliminated_letters) == 8
+          assert fake_round.information_saturated
+
+          # Synthetic high-Complexity Standard Endless candidates exercise the
+          # bucket selector. It should retain short hard words without allowing
+          # them to consume nearly the entire sequence.
+          def entry(word, length):
+              return WordEntry(
+                  word=word, complexity=9.6, raw_complexity=9.6,
+                  model_complexity=9.6, v05_complexity=9.6, band='10',
+                  family_id=word, length=length, pos_tags='NN', familiarity_score=0.5,
+              )
+
+          synthetic = WordBank.__new__(WordBank)
+          synthetic.bank_id = 'standard'
+          synthetic.words = []
+          synthetic.by_word = {}
+          alphabet = 'abcdefghijklmnopqrstuvwxyz'
+          for i in range(30):
+              # Unique alphabetic strings; actual spelling is irrelevant here.
+              suffix = alphabet[i % 26] + alphabet[(i // 26) % 26]
+              synthetic.words.append(entry('s' + suffix, 4))
+              synthetic.words.append(entry('medium' + suffix, 7))
+              synthetic.words.append(entry('longword' + suffix, 10))
+          synthetic._deadletter_endless = True
+          synthetic._deadletter_recent_lengths = []
+          rng = random.Random(42)
+          used = set()
+          lengths = []
+          for _ in range(60):
+              chosen = synthetic.choose(9.6, 0.2, used, rng)
+              used.add(chosen.family_id)
+              lengths.append(chosen.length)
+              synthetic._deadletter_recent_lengths = lengths[-6:]
+          short_share = sum(1 for n in lengths if n <= 5) / len(lengths)
+          assert short_share < 0.55, short_share
+          assert any(n >= 9 for n in lengths)
 
           def enter_first(g):
               g.start_round()
@@ -116,7 +177,7 @@ jobs:
                   del g._chapter_preview_entering
               assert g.round is not None
 
-          # Rare information scalers now start with useful baseline value.
+          # Rare information scalers retain useful baseline value.
           thes = GameState(bank, seed=222, difficulty='medium', bank_id='standard', telemetry_enabled=False)
           thes.glyphs = ['thesaurus']; thes._init_glyph_state('thesaurus')
           enter_first(thes)
@@ -127,8 +188,7 @@ jobs:
           enter_first(cards)
           assert len(cards.round.eliminated_letters) == 2, len(cards.round.eliminated_letters)
 
-          # Overtime is now a larger time tradeoff than Grace Period, not a
-          # smaller bonus with an added downside.
+          # Overtime remains a larger time tradeoff than Grace Period.
           base = GameState(bank, seed=444, difficulty='medium', bank_id='standard', telemetry_enabled=False)
           enter_first(base)
           over = GameState(bank, seed=444, difficulty='medium', bank_id='standard', telemetry_enabled=False)
@@ -136,8 +196,8 @@ jobs:
           enter_first(over)
           assert abs((over.round.initial_time - base.round.initial_time) - 7.0) < 0.001
 
-          # Boss-only insurance/preparation are stronger than their global
-          # counterparts on the round where they specialize.
+          # Boss-only insurance/preparation retain their specialization. The
+          # saturation floor is not reached by Preparation alone.
           boss = GameState(bank, seed=555, difficulty='medium', bank_id='standard', telemetry_enabled=False)
           boss.round_index = 3
           boss.chapter_bosses[0] = 'editor'
@@ -147,7 +207,7 @@ jobs:
           assert boss.round.max_mistakes == 8, boss.round.max_mistakes
           assert len(boss.round.eliminated_letters) == 5, len(boss.round.eliminated_letters)
 
-          print('Chapter preview and v1.1.11 balance checks OK')
+          print('Chapter preview and v1.1.12 systemic checks OK')
           '@ | python -
 
       - name: Generate application icons
@@ -188,7 +248,7 @@ jobs:
           $sourceFiles = @(
             "DeadLetter.pyw", "main.py", "game_logic.py", "effects.py", "content.py",
             "wordbank.py", "sound.py", "storage.py", "telemetry.py",
-            "ui_patch.py", "release_patch.py", "chapter_patch.py", "balance_patch.py", "update_manager.py", "updater.py"
+            "ui_patch.py", "release_patch.py", "chapter_patch.py", "balance_patch.py", "system_patch.py", "update_manager.py", "updater.py"
           )
           foreach ($file in $sourceFiles) { Copy-Item $file "$pkg\$file" }
           Copy-Item "data\words.csv" "$pkg\data\words.csv"
