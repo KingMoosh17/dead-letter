@@ -50,6 +50,19 @@ def _queue_path(data_dir: Path) -> Path:
     return path / "upload_queue.jsonl"
 
 
+def discard_queue(data_dir: Path | None) -> None:
+    """Delete unsent online telemetry when the player opts out."""
+    if data_dir is None:
+        return
+    try:
+        path = Path(data_dir) / "telemetry" / "upload_queue.jsonl"
+        with _lock:
+            path.unlink(missing_ok=True)
+            path.with_suffix(".tmp").unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _read_last_csv_row(path: Path) -> dict | None:
     try:
         with Path(path).open(newline="", encoding="utf-8") as f:
@@ -154,7 +167,6 @@ def flush_once(data_dir: Path) -> None:
     path = _queue_path(data_dir)
     batch, remaining = _load_batch(path)
     if not batch:
-        # Malformed leading queue entries may have been consumed.
         if remaining == [] and path.exists():
             _save_remaining(path, [])
         return
