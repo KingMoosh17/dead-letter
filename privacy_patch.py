@@ -31,6 +31,7 @@ def _ask_consent(app) -> None:
         "It does not send your name, email, account information, files, or a persistent player/device ID. "
         "Events are linked only within an individual run.\n\n"
         "You can change this later in Settings.",
+        default=messagebox.NO,
     )
     _save_remote_setting(app, enabled)
 
@@ -48,9 +49,28 @@ def patched_show_main_menu(self):
     return result
 
 
+def _walk(widget):
+    yield widget
+    for child in widget.winfo_children():
+        yield from _walk(child)
+
+
 def patched_show_settings(self):
     result = original_show_settings(self)
     try:
+        # The original settings copy predates online sharing; make the local/online
+        # distinction explicit without coupling the base settings screen to Supabase.
+        for widget in _walk(self.main):
+            try:
+                text = str(widget.cget("text"))
+            except (tk.TclError, AttributeError):
+                continue
+            if text.startswith("Telemetry stays on this computer"):
+                widget.config(
+                    text="Local telemetry stays on this computer. Anonymous sharing is controlled separately below."
+                )
+                break
+
         outer = self.main.winfo_children()[-1]
         share = tk.BooleanVar(value=bool(self.settings.get("remote_telemetry_enabled", False)))
         card = tk.Frame(
